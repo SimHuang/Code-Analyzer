@@ -66,10 +66,10 @@ namespace DefinedType
          * Method to parse through list of user input files and parse
          * for all user defined types
          */
-        public HashSet<string> getUserDefinedTypes(List<string> files) {
+        public static void parseUserDefinedTypes(List<string> files) {
 
             if (files.Count == 0) {
-                return null;
+                return;
             }
 
             foreach(String file in files)
@@ -100,7 +100,7 @@ namespace DefinedType
                 }
             }
 
-            return userDefinedSet;
+           // return userDefinedSet;
         }
     }
 

@@ -42,6 +42,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using DefinedType;
 
 namespace CodeAnalysis
 {
@@ -121,12 +122,10 @@ namespace CodeAnalysis
 
       //THIS RETURNS A LIST OF FILES THAT THE USER PASSED IN 
       List<string> files = TestParser.ProcessCommandline(args);
-            
-      //TODO: PARSE ENTIRE LIST OF FILES FOR ALL USER DEFINED TYPES FIRST AND RETURN IT IN HASHMAP
-      //EX: HashSet<string> userDefinedSet = something.getAllUserDefinedTyped(files);
-      //loop through every file and retrieve all user definied types that contains class, struct
 
-
+      //sh - preprocess all user input files to get all user defined types
+      UserType.parseUserDefinedTypes(files);
+      HashSet<string> definedSet = UserType.getUserDefinedSet();
 
       foreach (string file in files)
       {
