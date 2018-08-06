@@ -1,7 +1,7 @@
 /////////////////////////////////////////////////////////////////////////
 // Toker.cs  -  Tokenizer                                              //
 //              Reads words and punctuation symbols from a file stream //
-// ver 2.5                                                             //
+// ver 2.8                                                             //
 // Language:    C#, Visual Studio 10.0, .Net Framework 4.0             //
 // Platform:    Dell Precision T7400 , Win 7, SP 1                     //
 // Application: Pr#2 Help, CSE681, Fall 2011                           //
@@ -47,6 +47,15 @@
  * 
  * Maintenance History
  * ===================
+ * ver 2.8 : 14 Oct 14
+ * - fixed bug in extract that caused tokenizing of multiline string
+ *   to loop endlessly
+ * - reset lineCount in Attach function
+ * ver 2.7 : 21 Sep 14
+ * - made returning comments optional
+ * - fixed handling of @"..." strings
+ * ver 2.6 : 19 Sep 14
+ * - stopped returning comments in getTok function
  * ver 2.5 : 14 Aug 14
  * - added patch to handle @"..." string format
  * ver 2.4 : 24 Sep 11
@@ -103,12 +112,18 @@ namespace CStoker
     private List<string> tokBuffer = null;   // intermediate token store
     private string lineRemainder;            // unprocessed line fragment
 
+    //----< return comments? property >----------------------------------
+
+    public bool returnComments
+    {
+      get; set;
+    }
     //----< line count property >----------------------------------------
 
     public int lineCount
     {
       get;
-      set;
+      private set;
     }
     //----< constructor >------------------------------------------------
 
@@ -116,11 +131,13 @@ namespace CStoker
     {
       tokBuffer = new List<string>();
       lineCount = 0;
+      returnComments = false;
     }
     //----< opens file stream for tokenizing >---------------------------
 
     public bool openFile(string fileName)
     {
+      lineCount = 0;
       lineRemainder = "";
       try
       {
@@ -136,6 +153,7 @@ namespace CStoker
 
     public bool openString(string source)
     {
+      lineCount = 0;
       lineRemainder = "";
       try
       {
@@ -235,10 +253,13 @@ namespace CStoker
           }
         }
         line = extract(ref lineRemainder);
-        
+        //---- added 14 Oct 14
+        if (line == "")
+          lineRemainder = lineRemainder + readLine();
+        //---- end added
+
         // keep extracting until there is a line to tokenize
         // or tokBuffer has contents
-
       } while(line == "" && tokBuffer.Count == 0);
       return true;
     }
@@ -255,8 +276,7 @@ namespace CStoker
 
       int posErr = lineRemainder.IndexOf("@\"");
       if (posErr != -1)
-        //throw new Exception("Toker does not handle strings containing @\"");
-        lineRemainder.Remove(posErr, 1);
+        lineRemainder = mapToOldDoubleQuoteStyle(lineRemainder);
 
       int posCppComm = lineRemainder.IndexOf("//");
       int posCComm   = lineRemainder.IndexOf("/*");
@@ -285,12 +305,40 @@ namespace CStoker
         return extractSQuote(ref lineRemainder);
       throw new Exception("extract failed");
     }
+    //
+    //----< convert @ style string to old style >--------------------
+
+    string mapToOldDoubleQuoteStyle(string str)
+    {
+      bool foundNewStyle = false;
+      System.Text.StringBuilder temp = new StringBuilder();
+      int i;
+      for (i = 0; i < str.Length; ++i)
+      {
+        if (str[i] == '@')
+        {
+          foundNewStyle = true;
+          continue;
+        }
+        temp.Append(str[i]);
+        if (foundNewStyle)
+        {
+          if (str[i] == '\\')
+            temp.Append('\\');
+          if (str[i] == '"' && str[i - 1] != '\\' && str[i-1] != '@')
+            break;
+        }
+      }
+      for (int j = i + 1; j < str.Length; ++j)
+        temp.Append(str[j]);
+      return temp.ToString();
+    }
     //
     //----< extract double quote >-------------------------------------
 
     string extractDQuote(ref string lineRemainder)
     {
-      string retStr;
+      string retStr = "";
       int pos = lineRemainder.IndexOf('\"');
       if(pos == 0)
       {
@@ -316,7 +364,8 @@ namespace CStoker
         lineRemainder = lineRemainder.Remove(0,pos);
         return retStr;
       }
-      throw new Exception("extractDQuote failed");
+      //throw new Exception("extractDQuote failed");
+      return retStr;
     }
     //
     //----< extract single quote >-------------------------------------
@@ -514,6 +563,16 @@ namespace CStoker
         tok = tok.TrimEnd(trimChar);
         tokBuffer.Insert(0, "\n");
       }
+      if (returnComments)
+        return tok;
+
+      while(true)  // skip comments
+      {
+        if(tok.Length > 1 && tok[0] == '/' && (tok[1] == '*' || tok[1] == '/'))
+          tok = getTok();
+        else
+          break;
+      }
       return tok;
     }
     //----< look at next token without extracting >----------------------
@@ -546,12 +605,16 @@ namespace CStoker
       try
       {
         CToker toker = new CToker();
+        //toker.returnComments = true;
 
         if (args.Length == 0)
         {
           Console.Write("\n  Please enter name of file to tokenize\n\n");
           return;
         }
+
+        //sh-loops through all files in the commandline arguemnt
+        //for each file parse it
         foreach (string file in args)
         {
           string msg1;

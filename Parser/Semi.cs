@@ -438,8 +438,9 @@ namespace CSsemi
       test.returnNewLines = true;
       test.displayNewLines = true;
 
-      string testFile = "../../testSemi.txt";
-      if(!test.open(testFile))
+    //string testFile = "../../testSemi.txt";
+    string testFile = "./testSemi.txt"; 
+     if(!test.open(testFile))
         Console.Write("\n  Can't open file {0}",testFile);
       while(test.getSemi())
         test.display();
