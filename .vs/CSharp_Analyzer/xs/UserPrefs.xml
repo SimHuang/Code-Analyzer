@@ -1,8 +1,12 @@
 ﻿<Properties StartupConfiguration="{F648274D-662C-4A6F-81C6-8A2C74DAE085}|Default">
   <MonoDevelop.Ide.Workbench ActiveDocument="Parser/Parser.cs">
     <Files>
-      <File FileName="Parser/UserType.cs" Line="25" Column="14" />
-      <File FileName="Parser/Parser.cs" Line="1" Column="1" />
+      <File FileName="Parser/UserType.cs" Line="74" Column="13" />
+      <File FileName="Parser/Parser.cs" Line="162" Column="21" />
+      <File FileName="Parser/RulesAndActions.cs" Line="391" Column="10" />
+      <File FileName="Parser/Semi.cs" Line="448" Column="25" />
+      <File FileName="Parser/Toker.cs" Line="23" Column="10" />
+      <File FileName="Parser/testSemi.txt" Line="1" Column="1" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />

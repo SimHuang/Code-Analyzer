@@ -383,6 +383,35 @@ namespace CodeAnalysis
         }
     }
 
+    ////////////////////////////////////////////////////////
+    //sh-rule to detect inheritance
+    public class DetectInheritance : ARule
+    {
+        public override bool test(CSemiExp semi)
+        {
+            HashSet<string> definedSet = UserType.getUserDefinedSet();
+            Display.displayRules(actionDelegate, "rule Detect Inheritance");
+            int classIndex = semi.Contains("class");
+            if (classIndex != -1)
+            {
+                //check for inheritance
+                int inheritanceIndex = semi.Contains(":");
+                if (inheritanceIndex != -1)
+                {
+                    string inheritedClass = semi[inheritanceIndex + 1];
+                    if(definedSet.Contains(inheritedClass))
+                    {
+                        //do some action
+                        Console.Write("inheritance found: " + inheritedClass);
+                        //TODO: DO ACTIONS HERE
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
     /////////////////////////////////////////////////////////
     // rule to detect namespace declarations
 
