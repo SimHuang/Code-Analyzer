@@ -91,8 +91,15 @@ namespace DefinedType
                     //use the existing parser to test rule
                     while (semi.getSemi())
                     {
-                        parser.parse(semi);
-
+                        int index = isClassExpression(semi);
+                        if (index != -1)
+                        {
+                            CSsemi.CSemiExp local = new CSsemi.CSemiExp();
+                            // local semiExp with tokens for type and name
+                            local.displayNewLines = false;
+                            local.Add(semi[index]).Add(semi[index + 1]);
+                            userDefinedSet.Add(semi[index + 1]);
+                        }
                     }
                 }
                 catch (Exception ex) {
@@ -101,6 +108,24 @@ namespace DefinedType
             }
 
            // return userDefinedSet;
+        }
+
+        //helper function to detect class
+        private static int isClassExpression(CSsemi.CSemiExp semi) {
+            //parser.parse(semi);
+            int indexCL = semi.Contains("class");
+            int indexIF = semi.Contains("interface");
+            int indexST = semi.Contains("struct");
+
+            int index = Math.Max(indexCL, indexIF);
+            index = Math.Max(index, indexST);
+            if (index != -1)
+            {
+                
+                return index;
+            }
+
+            return -1;
         }
     }
 

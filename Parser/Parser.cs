@@ -126,6 +126,7 @@ namespace CodeAnalysis
       //sh - preprocess all user input files to get all user defined types
       UserType.parseUserDefinedTypes(files);
       HashSet<string> definedSet = UserType.getUserDefinedSet();
+      Console.Write("Parser size of definedset" + definedSet.Count.ToString());
 
       foreach (string file in files)
       {
@@ -160,25 +161,30 @@ namespace CodeAnalysis
         Repository rep = Repository.getInstance();
         List<Elem> table = rep.locations;
         Console.Write(
-            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}",
-            "category", "name", "bLine", "eLine", "bScop", "eScop", "size", "cmplx"
+            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9, 10}", 
+            "category", "name", "bLine", "eLine", "bScop", "eScop", "size", "cmplx", "coupling", "cohesion"
         );
         Console.Write(
-            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}",
-            "--------", "----", "-----", "-----", "-----", "-----", "----", "-----"
+            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}", 
+            "--------", "----", "-----", "-----", "-----", "-----", "----", "-----", "--------", "--------"
         );
         foreach (Elem e in table)
         {
           if (e.type == "class" || e.type == "struct")
             Console.Write("\n");
+
           Console.Write(
-            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}", 
+                "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}", 
             e.type, e.name, e.beginLine, e.endLine, e.beginScopeCount, e.endScopeCount+1,
-            e.endLine-e.beginLine+1, e.endScopeCount-e.beginScopeCount+1
+                e.endLine-e.beginLine+1, e.endScopeCount-e.beginScopeCount+1, e.coupling, e.cohesion
           );
+
+            //TODO: Calculate Maintainibility Index 
+           //Console.Write("Maintainibility Index: 0");
         }
 
-        Console.Write("\n");
+        Console.Write("\n\n");
+
         semi.close();
       }
       Console.Write("\n\n");

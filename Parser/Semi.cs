@@ -136,6 +136,7 @@ namespace CSsemi
       discardComments = true;  // not implemented yet
       returnNewLines = true;
       displayNewLines = false;
+      userInheritance = false;
     }
 
     //----< test for equality >------------------------------------------
@@ -361,6 +362,13 @@ namespace CSsemi
       }
       return disp.ToString();
     }
+
+    //boolean to keep track of whether the semi expression uses inheritance
+    public bool userInheritance {
+        get;
+        set;
+    }
+
     //----< announce tokens when verbose is true >-----------------------
 
     public bool verbose

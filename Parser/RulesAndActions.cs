@@ -106,6 +106,8 @@ namespace CodeAnalysis
     public int endLine { get; set; }
     public int beginScopeCount { get; set; }
     public int endScopeCount { get; set; }
+    public int coupling { get; set; }
+    public int cohesion { get; set;  }
 
     public override string ToString()
     {
@@ -125,7 +127,7 @@ namespace CodeAnalysis
     ScopeStack<Elem> stack_ = new ScopeStack<Elem>();
     List<Elem> locations_ = new List<Elem>();
     Dictionary<string, List<Elem>> locationsTable_ = new Dictionary<string, List<Elem>>();
-
+                      
     static Repository instance;
 
     public Repository()
@@ -137,6 +139,13 @@ namespace CodeAnalysis
     public static Repository getInstance()
     {
       return instance;
+    }
+
+    //------< keep track of the current class scope >-----------
+    //the type of the scope will always be class
+    public String currentClassScope {
+        get;
+        set;
     }
 
     //----< provides all actions access to current semiExp >-----------
@@ -209,7 +218,18 @@ namespace CodeAnalysis
       elem.endLine = 0;
       elem.beginScopeCount = repo_.scopeCount;
       elem.endScopeCount = 0;
+      elem.cohesion = 0;
+      elem.coupling = 0;
+
+      //keep track of the current class
+      if(elem.name != "anonymous") {
+        if(elem.type.Equals("class") || elem.type.Equals("struct") || elem.type.Equals("interface")) {
+            repo_.currentClassScope = elem.name; //set the current class name
+        }
+      }
+
       repo_.stack.push(elem);
+
       if (AAction.displayStack)
         repo_.stack.display();
       if (AAction.displaySemi)
@@ -223,8 +243,57 @@ namespace CodeAnalysis
       if (elem.type == "control" || elem.name == "anonymous")
         return;
       repo_.locations.Add(elem);
+      inheritCoupling(semi);
+      userCoupling(semi);
     }
+
+    //helper method to update the coupling parameter 
+    //base on inheritance if  conditions are met
+    public void inheritCoupling(CSsemi.CSemiExp semi) {
+        ///update class coupling if inheritance found
+        if (semi.userInheritance)
+        {
+          if (UserType.userDefinedSet.Contains(semi[2]))
+          {
+              string classScope = repo_.currentClassScope;
+              if (classScope != null)
+              {
+                  for (int i = 0; i < repo_.locations.Count; i++)
+                  {
+                      Elem tempElem = repo_.locations[i];
+                      if (tempElem.name.Equals(classScope))
+                      {
+                          repo_.locations[i].coupling += 1;
+                          break;
+                      }
+                  }
+              }
+          }
+        }
+    }
+
+    //helper method to update coupling base on use
+    public void userCoupling(CSsemi.CSemiExp semi) {
+        for (int i = 0; i < semi.count; i++) {
+            if(UserType.userDefinedSet.Contains(semi[i])) {
+                string classScope = repo_.currentClassScope;
+                if(classScope != null) {
+                    for (int j = 0; j < repo_.locations.Count; j++)
+                    {
+                        Elem tempElem = repo_.locations[j];
+                        if (tempElem.name.Equals(classScope))
+                        {
+                            repo_.locations[j].coupling += 1;
+                            break;
+                        }
+                    }
+                }
+            } 
+        }
+    }
+
   }
+
   /////////////////////////////////////////////////////////
   // pops scope info from stack when leaving scope
 
@@ -314,36 +383,61 @@ namespace CodeAnalysis
       this.display(semi);
     }
   }
-  /////////////////////////////////////////////////////////
-  // display public declaration
+    /////////////////////////////////////////////////////////
+    // display public declaration
 
-  public class SaveDeclar : AAction
-  {
-    public SaveDeclar(Repository repo)
+    public class SaveDeclar : AAction
     {
-      repo_ = repo;
+        public SaveDeclar(Repository repo)
+        {
+            repo_ = repo;
+        }
+        public override void doAction(CSsemi.CSemiExp semi)
+        {
+            Display.displayActions(actionDelegate, "action SaveDeclar");
+            Elem elem = new Elem();
+            elem.type = semi[0];  // expects type
+            elem.name = semi[1];  // expects name
+            elem.beginLine = repo_.semi.lineCount;
+            elem.endLine = elem.beginLine;
+            elem.beginScopeCount = repo_.scopeCount;
+            elem.endScopeCount = elem.beginScopeCount;
+            if (AAction.displaySemi)
+            {
+                Console.Write("\n  line# {0,-5}", repo_.semi.lineCount - 1);
+                Console.Write("entering ");
+                string indent = new string(' ', 2 * repo_.stack.count);
+                Console.Write("{0}", indent);
+                this.display(semi); // defined in abstract action
+            }
+            repo_.locations.Add(elem);
+        }
     }
-    public override void doAction(CSsemi.CSemiExp semi)
+
+    //////////////////////////////////////////////////////////
+    ///action to update the coupling value for a class elem
+    /// for now inner class and anonymous classes are ignored 
+                    /// deprecated
+    public class UpdateCoupling : AAction
     {
-      Display.displayActions(actionDelegate, "action SaveDeclar");
-      Elem elem = new Elem();
-      elem.type = semi[0];  // expects type
-      elem.name = semi[1];  // expects name
-      elem.beginLine = repo_.semi.lineCount;
-      elem.endLine = elem.beginLine;
-      elem.beginScopeCount = repo_.scopeCount;
-      elem.endScopeCount = elem.beginScopeCount;
-      if (AAction.displaySemi)
-      {
-        Console.Write("\n  line# {0,-5}", repo_.semi.lineCount - 1);
-        Console.Write("entering ");
-        string indent = new string(' ', 2 * repo_.stack.count);
-        Console.Write("{0}", indent);
-        this.display(semi); // defined in abstract action
-      }
-      repo_.locations.Add(elem);
+        public UpdateCoupling(Repository repo) {
+            repo_ = repo;
+        }
+
+        public override void doAction(CSemiExp semi)
+        {
+            string classScope = repo_.currentClassScope;
+            if(classScope != null) {
+                for (int i = 0; i < repo_.locations.Count; i++) {
+                    Elem tempElem = repo_.locations[i];
+                    if(tempElem.name.Equals(classScope)) {
+                        repo_.locations[i].coupling += 1;
+                        break;
+                    } 
+                }
+            }
+        }
     }
-  }
 
     //////////////////////////////////////////////////////////
     //action to save user defined type
@@ -363,23 +457,16 @@ namespace CodeAnalysis
         {
             int classIndex = semi.Contains("class");
             int structIndex = semi.Contains("struct");
-            Console.Write("\n");
 
             if (classIndex != -1)
             {
-                definedSet.Add(semi[classIndex + 1]);
+                UserType.getUserDefinedSet().Add(semi[classIndex + 1]);
                 string key = semi[classIndex + 1];
-                Console.Write(definedSet.Contains(key));
             }
             else if (structIndex != -1) {
                 string key = semi[structIndex + 1];
-                definedSet.Add(semi[structIndex + 1]);
-                Console.Write(definedSet.Contains(key));
+                UserType.getUserDefinedSet().Add(semi[structIndex + 1]);
             }
-            //for (int i = 0; i < semi.count; i++) {
-            //    Console.Write(semi[i] + " ");
-            //}
-            Console.Write("\n");
         }
     }
 
@@ -387,7 +474,7 @@ namespace CodeAnalysis
     //sh-rule to detect inheritance
     public class DetectInheritance : ARule
     {
-        public override bool test(CSemiExp semi)
+        public override bool test(CSsemi.CSemiExp semi)
         {
             HashSet<string> definedSet = UserType.getUserDefinedSet();
             Display.displayRules(actionDelegate, "rule Detect Inheritance");
@@ -402,8 +489,8 @@ namespace CodeAnalysis
                     if(definedSet.Contains(inheritedClass))
                     {
                         //do some action
-                        Console.Write("inheritance found: " + inheritedClass);
-                        //TODO: DO ACTIONS HERE
+                        Console.Write("inheritance found: " + inheritedClass + "\n");
+                        doActions(semi);
                         return true;
                     }
                 }
@@ -436,7 +523,7 @@ namespace CodeAnalysis
 
   /////////////////////////////////////////////////////////
   // rule to dectect class definitions
-
+  // this rule also detects inheritance in that class
   public class DetectClass : ARule
   {
     public override bool test(CSsemi.CSemiExp semi)
@@ -453,7 +540,16 @@ namespace CodeAnalysis
         CSsemi.CSemiExp local = new CSsemi.CSemiExp();
         // local semiExp with tokens for type and name
         local.displayNewLines = false;
-        local.Add(semi[index]).Add(semi[index + 1]);
+
+        //check for inheritance
+        if(semi.Contains(":") != -1) {
+            local.userInheritance = true;
+            local.Add(semi[index]).Add(semi[index + 1]).Add(semi[semi.Contains(":") + 1]);
+
+        }else {
+            local.Add(semi[index]).Add(semi[index + 1]);
+        }
+
         doActions(local);
         return true;
       }
@@ -484,6 +580,14 @@ namespace CodeAnalysis
       {
         CSsemi.CSemiExp local = new CSsemi.CSemiExp();
         local.Add("function").Add(semi[index - 1]);
+
+        //search for all arguments in the function and add to local
+        for (int i = index; i < semi.count; i++) {
+            if(UserType.userDefinedSet.Contains(semi[i])) {
+                local.Add(semi[i]);
+            }
+        }        
+
         doActions(local);
         return true;
       }
@@ -591,10 +695,16 @@ namespace CodeAnalysis
 
       // capture class info
       DetectClass detectCl = new DetectClass();
-      SaveUserDefinedType save = new SaveUserDefinedType(UserType.getUserDefinedSet());
+      //SaveUserDefinedType save = new SaveUserDefinedType(UserType.getUserDefinedSet());
       detectCl.add(push);
-      detectCl.add(save);
+      //detectCl.add(save);
       parser.add(detectCl);
+
+      //// handle inheritance detection
+      //DetectInheritance detectInheritance = new DetectInheritance();
+      //UpdateCoupling update = new UpdateCoupling(repo);
+      //detectInheritance.add(update);
+      //parser.add(detectInheritance);
 
       // capture function info
       DetectFunction detectFN = new DetectFunction();
