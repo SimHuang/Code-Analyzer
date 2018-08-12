@@ -2,20 +2,18 @@
   <MonoDevelop.Ide.Workbench ActiveDocument="Parser/IRuleandAction.cs">
     <Files>
       <File FileName="Parser/UserType.cs" Line="100" Column="51" />
-      <File FileName="Parser/Parser.cs" Line="138" Column="10" />
-      <File FileName="Parser/RulesAndActions.cs" Line="432" Column="1" />
-      <File FileName="Parser/Semi.cs" Line="120" Column="25" />
+      <File FileName="Parser/Parser.cs" Line="96" Column="1" />
+      <File FileName="Parser/RulesAndActions.cs" Line="533" Column="20" />
+      <File FileName="Parser/Semi.cs" Line="95" Column="33" />
       <File FileName="Parser/Toker.cs" Line="653" Column="40" />
       <File FileName="Parser/testSemi.txt" Line="1" Column="1" />
-      <File FileName="Parser/IRuleandAction.cs" Line="112" Column="43" />
-      <File FileName="Parser/ScopeStack.cs" Line="36" Column="4" />
+      <File FileName="Parser/IRuleandAction.cs" Line="109" Column="1" />
+      <File FileName="Parser/ScopeStack.cs" Line="44" Column="4" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
   <MonoDevelop.Ide.DebuggingService.Breakpoints>
-    <BreakpointStore>
-      <Breakpoint file="/Users/Simon/Desktop/Code-Analyzer/Parser/RulesAndActions.cs" relfile="Parser/RulesAndActions.cs" line="432" column="1" />
-    </BreakpointStore>
+    <BreakpointStore />
   </MonoDevelop.Ide.DebuggingService.Breakpoints>
   <MonoDevelop.Ide.DebuggingService.PinnedWatches />
   <MultiItemStartupConfigurations />

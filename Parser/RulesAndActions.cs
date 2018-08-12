@@ -148,6 +148,12 @@ namespace CodeAnalysis
         set;
     }
 
+    //------< keep track of the current function scope > ---------
+    public String currentFunctionScope {
+        get;
+        set;
+    }
+
     //----< provides all actions access to current semiExp >-----------
 
     public CSsemi.CSemiExp semi
@@ -221,10 +227,12 @@ namespace CodeAnalysis
       elem.cohesion = 0;
       elem.coupling = 0;
 
-      //keep track of the current class
+      //keep track of the current class and function scope
       if(elem.name != "anonymous") {
         if(elem.type.Equals("class") || elem.type.Equals("struct") || elem.type.Equals("interface")) {
             repo_.currentClassScope = elem.name; //set the current class name
+        }else if(elem.type.Equals("function")) {
+            repo_.currentFunctionScope = elem.name;    
         }
       }
 
@@ -243,8 +251,15 @@ namespace CodeAnalysis
       if (elem.type == "control" || elem.name == "anonymous")
         return;
       repo_.locations.Add(elem);
-      inheritCoupling(semi);
-      userCoupling(semi);
+      
+      //update coupling base on class inhertiance on use
+      if(semi.Contains("class") != -1) {
+          inheritCoupling(semi);
+
+      }else {
+          userCoupling(semi);   
+      }
+     
     }
 
     //helper method to update the coupling parameter 
@@ -277,14 +292,15 @@ namespace CodeAnalysis
         for (int i = 0; i < semi.count; i++) {
             if(UserType.userDefinedSet.Contains(semi[i])) {
                 string classScope = repo_.currentClassScope;
+                string functionScope = repo_.currentFunctionScope;
                 if(classScope != null) {
                     for (int j = 0; j < repo_.locations.Count; j++)
                     {
                         Elem tempElem = repo_.locations[j];
-                        if (tempElem.name.Equals(classScope))
+                        if (tempElem.name.Equals(classScope) || tempElem.name.Equals(functionScope)) 
                         {
                             repo_.locations[j].coupling += 1;
-                            break;
+                            //break;
                         }
                     }
                 }
@@ -310,6 +326,12 @@ namespace CodeAnalysis
       try
       {
         elem = repo_.stack.pop();
+        
+        //clear the function scope if we are exiting from it
+        if(elem.name.Equals(repo_.currentFunctionScope)) {
+            repo_.currentFunctionScope = "";
+        }
+
         for (int i = 0; i < repo_.locations.Count; ++i )
         {
           Elem temp = repo_.locations[i];
@@ -427,13 +449,22 @@ namespace CodeAnalysis
         public override void doAction(CSemiExp semi)
         {
             string classScope = repo_.currentClassScope;
+            string functionScope = repo_.currentFunctionScope;
             if(classScope != null) {
                 for (int i = 0; i < repo_.locations.Count; i++) {
                     Elem tempElem = repo_.locations[i];
-                    if(tempElem.name.Equals(classScope)) {
+
+                    //update class variable
+                    if(tempElem.name.Equals(classScope) || tempElem.name.Equals(functionScope)) {
                         repo_.locations[i].coupling += 1;
-                        break;
-                    } 
+
+                        //add one more if there is instantiation 
+                        if(semi.Contains("new") != -1) {
+                            repo_.locations[i].coupling += 1;
+                        }
+                        //break;
+
+                    }
                 }
             }
         }
@@ -470,8 +501,74 @@ namespace CodeAnalysis
         }
     }
 
+    //sh-rule to detect association which includes both aggregation and composition
+    //assumption is made that all 
+    public class DetectAssociation : ARule
+    {
+        public override bool test(CSemiExp semi)
+        {
+            HashSet<string> definedSet = UserType.userDefinedSet;
+            Display.displayFiles(actionDelegate, "rule Detect Association");
+            int publicIndex = semi.Contains("public");
+            int staticIndex = semi.Contains("static");
+            int privateIndex = semi.Contains("private");
+            int protectedIndex = semi.Contains("protected");
+
+            if(semi.Contains("class") == -1 && semi.Contains("interface") == -1) {  //not class            
+                //make sure it is not a function
+                if(semi.Contains("(") != -1 && semi.Contains(";") == -1) {
+                    return false;
+                }
+                
+                //parse for the index of the declaration type
+                int typeIndex = 0;  //the default type index is 0 if no special variables
+                //the coupling might datastructure related
+                if (semi.Contains("<") != -1)
+                {
+                    typeIndex = semi.Contains("<") + 1;
+
+                }
+                else if (staticIndex != -1)
+                {
+                    typeIndex = staticIndex + 1;
+
+                }
+                else if (publicIndex != -1 || privateIndex != -1 || protectedIndex != -1)
+                {
+                    int privacyIndex = Math.Max(Math.Max(publicIndex, privateIndex), protectedIndex);
+                    typeIndex = privacyIndex + 1;
+
+                }else {
+                    for (int i = 0; i < semi.count; i++) {
+                        if(UserType.userDefinedSet.Contains(semi[i])) {
+                            typeIndex = i;
+                            break;
+                        } 
+                    }     
+                }
+
+                string declarationType = semi[typeIndex];
+                
+                //only do action if this is user defined type
+                if (definedSet.Contains(declarationType))
+                {
+                    CSsemi.CSemiExp local = new CSemiExp();
+                    local.Add(declarationType);
+                    if(semi.Contains("new") != -1) {
+                        local.Add("new");
+                    }
+                    doActions(local);
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+    }
+
     ////////////////////////////////////////////////////////
     //sh-rule to detect inheritance
+    //deprecated
     public class DetectInheritance : ARule
     {
         public override bool test(CSsemi.CSemiExp semi)
@@ -556,6 +653,7 @@ namespace CodeAnalysis
       return false;
     }
   }
+
   /////////////////////////////////////////////////////////
   // rule to dectect function definitions
 
@@ -594,6 +692,7 @@ namespace CodeAnalysis
       return false;
     }
   }
+
   /////////////////////////////////////////////////////////
   // detect entering anonymous scope
   // - expects namespace, class, and function scopes
@@ -616,6 +715,10 @@ namespace CodeAnalysis
       return false;
     }
   }
+
+  /////////////////////////////////////////////////////////
+/// 
+
   /////////////////////////////////////////////////////////
   // detect public declaration
 
@@ -651,6 +754,7 @@ namespace CodeAnalysis
       return false;
     }
   }
+
   /////////////////////////////////////////////////////////
   // detect leaving scope
 
@@ -668,6 +772,7 @@ namespace CodeAnalysis
       return false;
     }
   }
+
   public class BuildCodeAnalyzer
   {
     Repository repo = new Repository();
@@ -717,16 +822,22 @@ namespace CodeAnalysis
       parser.add(anon);
 
       // show public declarations
-      DetectPublicDeclar pubDec = new DetectPublicDeclar();
-      SaveDeclar print = new SaveDeclar(repo);
-      pubDec.add(print);
-      parser.add(pubDec);
+      //DetectPublicDeclar pubDec = new DetectPublicDeclar();
+      //SaveDeclar print = new SaveDeclar(repo);
+      //pubDec.add(print);
+      //parser.add(pubDec);
 
       // handle leaving scopes
       DetectLeavingScope leave = new DetectLeavingScope();
       PopStack pop = new PopStack(repo);
       leave.add(pop);
       parser.add(leave);
+
+      //this rule detects variable declaration and instantiation for coupling
+      DetectAssociation detectAssociation = new DetectAssociation();
+      UpdateCoupling update = new UpdateCoupling(repo);
+      detectAssociation.add(update);
+      parser.add(detectAssociation); 
 
       // parser configured
       return parser;
