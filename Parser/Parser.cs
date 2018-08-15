@@ -97,6 +97,15 @@ namespace CodeAnalysis
       }
       return files;
     }
+    
+    //function to calculate 
+    static int getMaintainibilityIndex(Elem e) {
+        int a = 1;
+        int b = 2;
+        int c = 3;
+        int d = 4;
+        return (a * (e.endLine - e.beginLine + 1)) + (b * (e.endScopeCount - e.beginScopeCount + 1)) + (c * e.cohesion) + (d * e.coupling);
+    }
 
     static void ShowCommandLine(string[] args)
     {
@@ -161,26 +170,34 @@ namespace CodeAnalysis
         Repository rep = Repository.getInstance();
         List<Elem> table = rep.locations;
         Console.Write(
-            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9, 10}", 
-            "category", "name", "bLine", "eLine", "bScop", "eScop", "size", "cmplx", "coupling", "cohesion"
+            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9, 10}, {10,6}", 
+            "category", "name", "bLine", "eLine", "bScop", "eScop", "size", "cmplx", "coupling", "cohesion", "M-Index"
         );
         Console.Write(
-            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}", 
-            "--------", "----", "-----", "-----", "-----", "-----", "----", "-----", "--------", "--------"
+            "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}, {10,6}",  
+            "--------", "----", "-----", "-----", "-----", "-----", "----", "-----", "--------", "--------", "-------"
         );
         foreach (Elem e in table)
         {
-          if (e.type == "class" || e.type == "struct")
-            Console.Write("\n");
+            if (e.type == "class" || e.type == "struct") {
+                Console.Write("\n");
+                   
+                //get the maintainibility index
+                e.mIndex = getMaintainibilityIndex(e);
 
-          Console.Write(
-                "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}", 
-            e.type, e.name, e.beginLine, e.endLine, e.beginScopeCount, e.endScopeCount+1,
-                e.endLine-e.beginLine+1, e.endScopeCount-e.beginScopeCount+1, e.coupling, e.cohesion
-          );
-
-            //TODO: Calculate Maintainibility Index 
-           //Console.Write("Maintainibility Index: 0");
+                Console.Write(
+                "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}, {10,6}",
+                      e.type, e.name, e.beginLine, e.endLine, e.beginScopeCount, e.endScopeCount + 1,
+                          e.endLine - e.beginLine + 1, e.endScopeCount - e.beginScopeCount + 1, e.coupling, e.cohesion, e.mIndex
+                    );
+            }else {
+                Console.Write(
+                          "\n  {0,10}, {1,25}, {2,5}, {3,5}, {4,5}, {5,5}, {6,5}, {7,5}, {8,10}, {9,10}",
+                      e.type, e.name, e.beginLine, e.endLine, e.beginScopeCount, e.endScopeCount + 1,
+                          e.endLine - e.beginLine + 1, e.endScopeCount - e.beginScopeCount + 1, e.coupling, e.cohesion
+                    );
+                
+            }
         }
 
         Console.Write("\n\n");

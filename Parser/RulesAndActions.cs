@@ -108,6 +108,7 @@ namespace CodeAnalysis
     public int endScopeCount { get; set; }
     public int coupling { get; set; }
     public int cohesion { get; set;  }
+    public int mIndex { get; set; }
 
     public override string ToString()
     {
@@ -127,6 +128,7 @@ namespace CodeAnalysis
     ScopeStack<Elem> stack_ = new ScopeStack<Elem>();
     List<Elem> locations_ = new List<Elem>();
     Dictionary<string, List<Elem>> locationsTable_ = new Dictionary<string, List<Elem>>();
+    Dictionary<string, List<Elem>> functionData = new Dictionary<string, List<Elem>>(); //keep track of all the function members for cohesion
                       
     static Repository instance;
 
@@ -160,6 +162,12 @@ namespace CodeAnalysis
     {
       get;
       set;
+    }
+
+    //-----< keeps track of the number of functions in a class >-----
+    public int functionCount {
+        get;
+        set;
     }
 
     // semi gets line count from toker who counts lines
@@ -201,6 +209,12 @@ namespace CodeAnalysis
     {
       get { return locationsTable_; }
       set { locationsTable_ = value; } 
+    }
+    
+    //setters and getters for function table
+    public Dictionary<string,List<Elem>> FunctionTable {
+        get { return functionData;  }
+        set { functionData = value; }
     }
 
   }
@@ -503,17 +517,36 @@ namespace CodeAnalysis
 
     //sh-rule to detect association which includes both aggregation and composition
     //assumption is made that all 
+    //this also handles the logic for cohesion
     public class DetectAssociation : ARule
     {
         public override bool test(CSemiExp semi)
         {
             HashSet<string> definedSet = UserType.userDefinedSet;
+            string[] specialTokens = { "get", "set" };
             Display.displayFiles(actionDelegate, "rule Detect Association");
             int publicIndex = semi.Contains("public");
             int staticIndex = semi.Contains("static");
             int privateIndex = semi.Contains("private");
             int protectedIndex = semi.Contains("protected");
 
+            //ignoreing special words as aggregation
+            for (int i = 0; i < specialTokens.Length; i++) {
+                if(semi.Contains(specialTokens[i]) != -1) {
+                    return false;
+                }
+            }
+            
+            //edge case for a single semi colon
+            if (semi.count == 1 && semi[0].Equals(";")) {
+                return false;
+            }
+            
+            //these characteristics is probably a function call rather than a declaration
+            if (semi.Contains(".") != -1 && semi.Contains("(") != -1) {
+                return false; 
+            }
+ 
             if(semi.Contains("class") == -1 && semi.Contains("interface") == -1) {  //not class            
                 //make sure it is not a function
                 if(semi.Contains("(") != -1 && semi.Contains(";") == -1) {
@@ -546,11 +579,33 @@ namespace CodeAnalysis
                         } 
                     }     
                 }
-
-                string declarationType = semi[typeIndex];
                 
-                //only do action if this is user defined type
-                if (definedSet.Contains(declarationType))
+                //keep track of the declaration type
+                string declarationType = semi[typeIndex];
+
+                //store all data type and data member in repo for cohesion use
+                Repository repository = Repository.getInstance();
+                if(repository.currentClassScope != null && repository.currentClassScope != "") 
+                {
+                    CSsemi.CSemiExp local = new CSemiExp();
+                    local.Add(declarationType);
+                    local.Add(semi[typeIndex + 1]);
+
+                    if (repository.currentFunctionScope == null || repository.currentFunctionScope.Equals(""))
+                    {
+                        //since we are not in a function scope we can just store the class data members 
+                        storeClassDataMember(repository, local);
+
+                    }
+                    else
+                    {
+                        //we are in a function scope so process the varibales in the function for cohesion
+                        processFunctionCohesion(repository, local);
+                    }
+                }
+                
+                //only do action if this is user defined type for coupling
+                if (UserType.userDefinedSet.Contains(declarationType))
                 {
                     CSsemi.CSemiExp local = new CSemiExp();
                     local.Add(declarationType);
@@ -563,6 +618,106 @@ namespace CodeAnalysis
             }
             
             return false;
+        }
+
+        ////helper method to store all class data memebers in repo
+        public void storeClassDataMember(Repository repository, CSsemi.CSemiExp local) 
+        {
+            if(repository != null) {
+                if(repository.currentClassScope != null && (repository.currentFunctionScope == "" || repository.currentFunctionScope == null)) {
+                    Dictionary<string, List<Elem>> locationsTable = repository.LocationsTable;
+                    Elem elem = new Elem();
+                    elem.type = local[0];
+                    elem.name = local[1];
+
+                    if(locationsTable.ContainsKey(repository.currentClassScope)) {
+                        List<Elem> elements = locationsTable[repository.currentClassScope];
+                        elements.Add(elem);
+                        locationsTable[repository.currentClassScope] = elements;
+
+                     }else {
+                        List<Elem> elements = new List<Elem>();
+                        elements.Add(elem);
+                        locationsTable.Add(repository.currentClassScope, elements);
+                     }
+                }
+            }    
+        }
+        
+        ////helper method to calculation cohesion of a function 
+        public void processFunctionCohesion(Repository repository, CSsemi.CSemiExp local) 
+        {
+            if(repository != null) {
+                Elem elem = new Elem();
+                elem.type = local[0];
+                elem.name = local[1];
+
+                string currentClassScope = repository.currentClassScope;
+                Dictionary<string, List<Elem>> classDataMembers = repository.LocationsTable;
+
+                if(classDataMembers.ContainsKey(currentClassScope)) {
+                    List<Elem> classScopeVariables = classDataMembers[currentClassScope];
+
+                    string keyname = elem.type + elem.name;
+                    Dictionary<string, List<Elem>> functions = repository.FunctionTable;
+
+                    //if the dictionary already store the existing function
+                    if(functions.ContainsKey(keyname)) {
+                        //first find all variables that the current function has
+                        for (int i = 0; i < classScopeVariables.Count; i++)
+                        {
+                            Elem tempElem = classScopeVariables[i];
+                            if (elem.name.Equals(tempElem.name) && elem.type.Equals(tempElem.type))
+                            {
+                                List<Elem> functionVariables = functions[keyname];
+                                functionVariables.Add(elem);
+                                functions[keyname] = functionVariables;
+
+                                //increment the cohesion for that function elem
+                                for (int j = 0; j < repository.locations.Count; j++)
+                                {
+                                    Elem currentElem = repository.locations[i];
+
+                                    //update class variable
+                                    if (currentElem.name.Equals(elem.name))
+                                    {
+                                        repository.locations[j].cohesion += 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }    
+
+                    }else {
+                        for (int i = 0; i < classScopeVariables.Count; i++)
+                        {
+                            Elem tempElem = classScopeVariables[i];
+                            if (elem.name.Equals(tempElem.name) && elem.type.Equals(tempElem.type))
+                            {
+                                List<Elem> functionVariables = new List<Elem>();
+                                functionVariables.Add(elem);
+                                functions[keyname] = functionVariables;
+
+                                //increment the cohesion for that function elem
+                                for (int j = 0; j < repository.locations.Count; j++)
+                                {
+                                    Elem currentElem = repository.locations[i];
+
+                                    //update class variable
+                                    if (currentElem.name.Equals(elem.name))
+                                    {
+                                        repository.locations[j].cohesion += 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }     
+                    }
+
+                }else {
+                    return;
+                }
+            }
         }
     }
 
